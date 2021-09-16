@@ -2,28 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { useState, useEffect } from 'react'
 
+import Papa from 'papaparse'
+
 import DataTableImport from './DataTableImport'
 import DataTableRaw from './DataTableRaw'
-
-const SettingField = (props) =>
-{
-	return (
-		<button
-			onClick={ () => props.handleClick(props.name) }
-			value={props.name}
-		>
-			{props.label}
-			{postTypes.length && '(' + props.postTypes.length + ')'}
-		</button>
-	);
-}
-
-const ImportToField = (props) =>
-{
-	return (
-		<input type="text" />
-	);
-}
 
 /**
  * 後々、API も足す
@@ -44,7 +26,12 @@ const CsvReader = (props) =>
 		reader.onload = (e) =>
 		{
 			const result = e.target.result;
-			const csvArr = csvArray(result);
+
+			const papa = Papa.parse(result);
+			const csvArr = papa.data
+			console.log('paraparse', papa.data);
+			
+			// const csvArr = csvArray(result);
 
 			let colsNum = 0;
 			for (let i =0; i < csvArr.length; i++)
@@ -117,7 +104,6 @@ const PostImporter = (props) =>
 	/**
 	 * PostType Settings
 	 */
-	// const [ postType, setPostType ] = useState('');
 	const [ postTypes, setPostTypes ] = useState([]);
 	const changePostTypes = (post_type) =>
 	{
@@ -393,7 +379,7 @@ const PostImporter = (props) =>
 		const newConfig = {
 			'configName'    : configName,
 			'encoding'      : encoding,
-			'postType'      : postType,
+			'postTypes'     : postTypes,
 			'searchField'   : searchField,
 			'importFields'  : importFields,
 			'importSetting' : importSetting,
@@ -479,7 +465,7 @@ const PostImporter = (props) =>
 
 		setConfigName(loadConfig.configName);
 		setEncoding(loadConfig.encoding);
-		setPostType(loadConfig.postType);
+		setPostTypes(loadConfig.postTypes);
 		setSearchField(loadConfig.searchField);
 		setImportFields(loadConfig.importFields);
 		setImportSetting(loadConfig.importSetting);
@@ -515,57 +501,87 @@ const PostImporter = (props) =>
 
 	return (<div>
 
-		<ul>
-		{
-			configs.map((config, i) =>
-			{
-				return (<li>
-					{ config.configName ? config.configName : i }
-					<button onClick={ () => applyConfig(i)}>適用</button>
-					<button onClick={ () => deleteConfig(i)}>remove</button>
-				</li>);
-			})
-		}
-		</ul>
-		<input type="text" onChange={ (e) => setConfigName(e.target.value) } placeholder="設定名、同じ名前は上書きされます" size="40" />
-		<button onClick={addConfig}>現在の設定を保存</button>
+		<table className="widefat fixed striped">
+			<tbody>
+				<tr>
+					<th>設定ファイル</th>
+					<td>
+						<ul>
+						{
+							configs.map((config, i) =>
+							{
+								return (<li>
+									{ config.configName ? config.configName : i }
+									<button onClick={ () => applyConfig(i)}>適用</button>
+									<button onClick={ () => deleteConfig(i)}>remove</button>
+								</li>);
+							})
+						}
+						</ul>
+					</td>
+				</tr>
+				<tr>
+					<th>現在の設定を保存</th>
+					<td>
+						<input type="text" onChange={ (e) => setConfigName(e.target.value) } placeholder="設定名、同じ名前は上書きされます" size="40" />
+						<button onClick={addConfig}>現在の設定を保存</button>
+					</td>
+				</tr>
+				<tr>
+					<th>Encoding</th>
+					<td>
+						<select onChange={(e) => setEncoding(e.target.value)} value={encoding}>
+							<option value="SJIS">SJIS</option>
+							<option value="EUCJP">EUCJP</option>
+							<option value="UTF8">UTF8</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th>インポート先ポストタイプ</th>
+					<td>
+							{Object.keys(props.config).map((key) => {
+								return (<label>
+									<input type="checkbox" value={key} checked={postTypes.indexOf(key) > -1} onChange={ () => changePostTypes(key) } />
+									{props.config[key].label}
+								</label>);
+							})}
+							{ /*
+							<select onChange={(e) => { console.log(e.target.value); setPostType(e.target.value)} }>
+								<option value=""></option>
+							{Object.keys(props.config).map((key) => {
+								return <option value={key}>{props.config[key].label}</option>
+							})}
+							</select>
+							*/ }
+					</td>
+				</tr>
+				<tr>
+					<th>ファイル読み込み</th>
+					<td>
+						<CsvReader
+							callback={csvRead}
+						/>
+									</td>
+				</tr>
+				<tr>
+					<th></th>
+					<td>
+						<label>CSV元データ表示:
+							<input type="checkbox" onChange={ (e) => setShowRawData(!showRawData) } checked={showRawData} />
+						</label>
+					</td>
+				</tr>
+			</tbody>
+		</table>
 
-		<CsvReader
-			callback={csvRead}
-		/>
-
-		<label>Encoding:
-			<select onChange={(e) => setEncoding(e.target.value)} value={encoding}>
-				<option value="SJIS">SJIS</option>
-				<option value="EUCJP">EUCJP</option>
-				<option value="UTF8">UTF8</option>
-			</select>
-		</label>
-
-		<div>インポート先ポストタイプ
-			{Object.keys(props.config).map((key) => {
-				return (<label>
-					<input type="checkbox" value={key} checked={postTypes.indexOf(key) > -1} onChange={ () => changePostTypes(key) } />
-					{props.config[key].label}
-				</label>);
-			})}
-			{ /*
-			<select onChange={(e) => { console.log(e.target.value); setPostType(e.target.value)} }>
-				<option value=""></option>
-			{Object.keys(props.config).map((key) => {
-				return <option value={key}>{props.config[key].label}</option>
-			})}
-			</select>
-			*/ }
-		</div>
 
 
-		<label>CSV元データ表示:
-			<input type="checkbox" onChange={ (e) => setShowRawData(!showRawData) } checked={showRawData} />
-		</label>
+
+
 
 		<h3>検索対象フィールド</h3>
-		<table className="widefat fixed">
+		<table className="widefat fixed striped">
 			<thead>
 				<tr>
 					<th>ファイルの〜と</th>
@@ -639,7 +655,7 @@ const PostImporter = (props) =>
 			{
 				return (
 					<button
-						onClick={ () => addImportField(props.name) }
+						onClick={ () => addImportField(item.name) }
 						value={item.name}
 					>
 						{item.label}
@@ -648,7 +664,7 @@ const PostImporter = (props) =>
 				);
 			})
 		}
-		<table className="widefat fixed">
+		<table className="widefat fixed striped">
 			<thead>
 				<tr>
 					<th>ファイルの〜から</th>

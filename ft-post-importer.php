@@ -124,14 +124,11 @@ class FtPostImporter
 		if (!isset($_POST['posts']) || !is_array($_POST['posts'])) return;
 		global $wpdb;
 
-		$post_type  = isset($_POST['post_type']) ? $_POST['post_type'] : false;
-		if (!$post_type) return;
-
 		// live run
-		$live_run    = isset($_POST['live']) ? $_POST['live'] : false;
-		$empty_value = isset($_POST['setting']['empty_value']) ? $_POST['setting']['empty_value'] : false;
-		$multiple    = isset($_POST['setting']['multiple']) ? $_POST['setting']['multiple'] : false;
-		$create      = isset($_POST['setting']['create']) ? $_POST['setting']['create'] : false;
+		$live    = isset($_POST['live']) && $_POST['live'];
+		$empty_value = isset($_POST['setting']['empty_value']) && $_POST['setting']['empty_value'];
+		$multiple    = isset($_POST['setting']['multiple']) && $_POST['setting']['multiple'];
+		$create      = isset($_POST['setting']['create']) && isset($_POST['setting']['create']);
 
 		// search なければ検索しない
 		$search_to      = isset($_POST['search']['to']) ? $_POST['search']['to'] : false;
@@ -140,15 +137,25 @@ class FtPostImporter
 
 		// echo json_encode($_POST); die();
 
-
 		$import_results = array();
 		foreach ($_POST['posts'] as $index => $data)
 		{
+			$results = [];
 			/**
 			 * search post
 			 */
 			if ($search && isset($data['search']) && $data['search'])
 			{
+
+				$post_types_query = "";
+				if (isset($_POST['post_types']) && is_array($_POST['post_types']))
+				{
+					$post_types_query = " AND `".$wpdb->posts."`.post_type IN ('".implode("','", $_POST['post_types'])."') ";
+					foreach ($_POST['post_types'] as $post_type)
+					{
+					}
+				}
+
 				if (in_array($search_to, [
 					'ID',
 					'post_title',
@@ -156,29 +163,26 @@ class FtPostImporter
 					'post_excerpt',
 				]))
 				{
-				$query = "SELECT ID FROM $wpdb->posts
-					WHERE ".esc_sql($search_to)." ".$search_compare." %s
-						AND post_type = %s
-						AND `$wpdb->posts`.post_status NOT IN ('inherit', 'auto-draft', 'trash');";
+					$query = "SELECT ID FROM $wpdb->posts
+						WHERE ".esc_sql($search_to)." ".$search_compare." %s
+							$post_types_query
+							AND `$wpdb->posts`.post_status NOT IN ('inherit', 'auto-draft', 'trash');";
 				}
 				else
 				{
-				$query = "SELECT `$wpdb->posts`.ID FROM $wpdb->posts
-					INNER JOIN $wpdb->postmeta ON `$wpdb->posts`.ID = `$wpdb->postmeta`.post_id
-					WHERE
-						`$wpdb->postmeta`.meta_key = ".esc_sql($search_to)."
-						AND `$wpdb->postmeta`.meta_value ".$search_compare." %s
-						AND `$wpdb->posts`.post_type = %s
-						AND `$wpdb->posts`.post_status NOT IN ('inherit', 'auto-draft', 'trash');";
+					$query = "SELECT `$wpdb->posts`.ID FROM $wpdb->posts
+						INNER JOIN $wpdb->postmeta ON `$wpdb->posts`.ID = `$wpdb->postmeta`.post_id
+						WHERE
+							`$wpdb->postmeta`.meta_key = ".esc_sql($search_to)."
+							AND `$wpdb->postmeta`.meta_value ".$search_compare." %s
+							$post_types_query
+							AND `$wpdb->posts`.post_status NOT IN ('inherit', 'auto-draft', 'trash');";
 				}
-				$results = $wpdb->get_results( $wpdb->prepare( $query,
-					$data['search'],
-					$post_type
-				) );
-				// $import_results[] = $wpdb->last_query;
-				$import_results[] =$results; //  $wpdb->last_query;
-			}
 
+				$results = $wpdb->get_results( $wpdb->prepare( $query,
+					$data['search']
+				) );
+			}
 
 			/**
 			 * import
@@ -186,11 +190,12 @@ class FtPostImporter
 			if (count($results) == 1)
 			{
 
-				$import_result = static::import($results, $data, $live);
+				$import_result = static::import($results, $data, $live, $empty_value);
 
 				$import_results[$index] = [
 					'live'    => $live,
 					'status'  => 'success',
+					'type'  => 'update',
 					'index'   => $index,
 					'import_result' => $import_result,
 				];
@@ -200,11 +205,12 @@ class FtPostImporter
 			{
 				if ($multiple)
 				{
-					$import_result = static::import($results, $data, $live);
+					$import_result = static::import($results, $data, $live, $empty_value);
 
 					$import_results[$index] = [
 						'live'    => $live,
 						'status'  => 'success',
+						'type'  => 'update',
 						'index'   => $index,
 						'import_result' => $import_result,
 					];
@@ -230,7 +236,7 @@ class FtPostImporter
 					];
 				}
 			}
-			else // 0 件
+			else // 0 件 もしくは search がない
 			{
 				if ($create)
 				{
@@ -275,6 +281,7 @@ class FtPostImporter
 					$import_results[$index] = [
 						'live'    => $live,
 						'status'  => 'success',
+						'type'  => 'create',
 						'index'   => $index,
 						'import_result' => $import_result,
 					];
@@ -294,9 +301,7 @@ class FtPostImporter
 			}
 		}
 
-		echo json_encode(array(
-			'posts' => $import_results,
-		));
+		echo json_encode($import_results);
 		die();
 
 		foreach (array(
@@ -324,7 +329,7 @@ class FtPostImporter
 		die();
 	}
 
-	protected static function import($results, $data, $live = false)
+	protected static function import($results, $data, $live = false, $empty_value = false)
 	{
 		$import_result = [];
 		foreach ($results as $result)
@@ -335,6 +340,12 @@ class FtPostImporter
 			$change = [];
 			foreach ($data['fields'] as $fieldname => $fieldvalue)
 			{
+				// 空値の上書きが無かつ空値だったら continue
+				if (!$empty_value && $fieldvalue == '')
+				{
+					continue;
+				}
+
 				if (in_array($fieldname, [
 					'ID',
 					'post_title',
@@ -353,7 +364,7 @@ class FtPostImporter
 					if ($post->{$fieldname} != $fieldvalue)
 					{
 						$change[$fieldname] = [$post->{$fieldname}, $fieldvalue];
-						if ($live) update_post_meta($results->ID, $fieldname, $fieldvalue);
+						if ($live) update_post_meta($result->ID, $fieldname, $fieldvalue);
 					}
 				}
 			}

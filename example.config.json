@@ -1,0 +1,87 @@
+{
+	"test_post":
+	{
+		"label": "テスト用ポストタイプ",
+		"public": true,
+		"has_archive": true,
+		"menu_position": 10,
+		"supports": [
+			"title",
+			"editor",
+			"",
+			""
+		],
+		"meta": {
+			"text": {
+				"label": "テキストフィールド",
+				"type": "text",
+				"default": "",
+				"validation": []
+			},
+			"textarea": {
+				"label": "テキストエリア",
+				"type": "textarea",
+				"default": "",
+				"validation": []
+			},
+			"select": {
+				"label": "セレクト",
+				"type": "select",
+				"options": {
+					"1": "hoge",
+					"2": "fuga",
+					"3": "piyo"
+				},
+				"default": "",
+				"validation": []
+			},
+			"radio": {
+				"label": "ラジオボタン",
+				"type": "radio",
+				"options": {
+					"1": "hoge",
+					"2": "fuga",
+					"3": "piyo"
+				},
+				"default": "",
+				"validation": []
+			},
+			"checkbox": {
+				"label": "チェックボックス",
+				"type": "checkbox",
+				"options": {
+					"1": "hoge",
+					"2": "fuga",
+					"3": "piyo"
+				},
+				"default": "",
+				"validation": []
+			},
+			"group": {
+				"label": "グループ",
+				"type": "group",
+				"meta": {
+					"date": {
+						"label": "日付",
+						"type": "date",
+						"default": "",
+						"validation": []
+					},
+					"time": {
+						"label": "時間",
+						"type": "time",
+						"default": "",
+						"validation": []
+					},
+					"datetime": {
+						"label": "日時",
+						"type": "datetime-local",
+						"default": "",
+						"validation": []
+					}
+				}
+			}
+		}
+	}
+}
+
